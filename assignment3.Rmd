@@ -8,6 +8,8 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(magrittr)
+library(ggplot2)
+library(gghighlight)
 ```
 
 ## Question 1
@@ -30,6 +32,8 @@ To perform a Runs Test the observations are combined into one collection of $n =
 
 Let $R$ denote the number of runs in the combined ordered sample of $X \in \{0, 1\}$. Under $H_0$, $R$ can be approximated as a normally distributed random variable, assuming both $n_0$ and $n_1$ are sufficiently large.
 
+$R = 1 + \sum\limits_{i=2}^nI_{(X_i, X_{i-1})}$, where $I_{(X_i, X_{i-1})} = 0$ if $X_i = X_{i-1}$ and $I_{(X_i, X_{i-1})} = 1$ if $X_i \ne X_{i-1}$
+
 $\bar{R} = \dfrac{2n_0n_1}{n} + 1$
 
 $Var(\bar{R}) = \dfrac{2n_0n_1(2n_0n_1-n)}{n^2(n - 1)}$
@@ -38,15 +42,40 @@ With test statistic $Z = \dfrac{R-\bar{R}}{\sqrt{Var(\bar{R})}}$ where $Z \sim N
 
 b)
 
-```{r runs_test}
+A small number of runs (a small value for $R$) would indicate that $X_i$ is more likely to be the same as $X_{i-1}$. A large number means that $X$ is fluctuating regularly between values and $X$ is less likely to be the same as $X_{i - 1}$.
+
+c)
+
+```{r runs_test_parametric}
 ## 0 healthy, 1 has disease
 X <- "HHHDDDHDDHHHHHDHHHHHHHHHHHDDDHHHHDDDHHHHDHHHDHH" %>% 
   stringr::str_split("") %>% unlist() %>% `==`("D") %>% as.integer()
 
-n_0 <- length(X) - sum(X)
+n <- length(X)
+n_0 <- n - sum(X)
 n_1 <- sum(X)
 
-(2 * n_0 * n_1)/length(X) + 1
+R <- 1 + sum(X[2:n] != X[1:n-1])
+R_est <- 1 + 2*n_0*n_1/n
+R_var <- (2*n_0*n_1*(2*n_0*n_1 - n))/(n^2*(n - 1))
+Z <- (R - R_est)/sqrt(R_var)
+p <- pnorm(Z)
+cbind(R, R_est, R_var, Z, p)
+```
+
+```{r runs_test_graph}
+xs <- data.frame(x = seq(-4, 4, length.out = 100)) %>% dplyr::mutate(density = dnorm(x))
+
+ggplot(xs, aes(x, density)) + 
+  geom_area(fill = "firebrick") + 
+  gghighlight(x < Z)
+```
+
+With p = `r round(p, digits = 4)` we reject $H_0$ at the 5% level. The values are not randomly ordered.
+
+d)
+
+```{r runs_test_permutation}
 
 
 ```
