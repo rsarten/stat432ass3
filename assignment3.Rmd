@@ -2,7 +2,9 @@
 title: "Assignment 3"
 author: "Rory Sarten 301005654"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: pdf_document
+output:
+  pdf_document:
+    pandoc_args: "--highlight-style=breezeDark"
 ---
 
 ```{r setup, include=FALSE}
@@ -63,19 +65,40 @@ p <- pnorm(Z)
 cbind(R, R_est, R_var, Z, p)
 ```
 
-```{r runs_test_graph}
-xs <- data.frame(x = seq(-4, 4, length.out = 100)) %>% dplyr::mutate(density = dnorm(x))
-
-ggplot(xs, aes(x, density)) + 
-  geom_area(fill = "firebrick") + 
-  gghighlight(x < Z)
-```
-
-With p = `r round(p, digits = 4)` we reject $H_0$ at the 5% level. The values are not randomly ordered.
+With p-value of `r round(p, digits = 4)` we reject $H_0$ at the 5% level. We conclude that values are not randomly ordered.
 
 d)
 
 ```{r runs_test_permutation}
+set.seed(101)
 
+calc_R <- function(input) {
+  1 + sum(input[2:length(input)] != input[1:length(input)-1])
+}
 
+sample_R <- function(i, input) {
+  input %>% sample() %>% calc_R()
+}
+
+initial_R <- calc_R(X)
+
+N <- 1e4
+perm_R <- 1:N %>% sapply(sample_R, input = X)
+
+p <- length(perm_R[perm_R < initial_R])/length(perm_R)
+p
+
+ggplot() + 
+  geom_histogram(data = data.frame(x = perm_R[perm_R >= initial_R]), 
+                 aes(x = x), binwidth = 1) +
+  geom_histogram(data = data.frame(x = perm_R[perm_R < initial_R]), 
+                 aes(x = x), binwidth = 1, fill = "firebrick") +
+  geom_vline(xintercept = initial_R, colour = "firebrick") +
+  ggtitle("Number of Runs for permutations") +
+  xlab("Runs") +
+  geom_text(aes(x = 12, y = 250), label = "Runs < initial R")
 ```
+
+Because the number of runs is not a continuous variable, there is some ambiguity around whether the p-value should be calculated comparing values < or <= or even using some half point. I have decided to use < as it gives the test the highest power.
+
+Given this we find a p-value of `r round(p, digits = 4)`. We reject $H_0$ at the 5% level. We conclude that values are not randomly ordered.
