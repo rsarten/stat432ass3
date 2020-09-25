@@ -140,7 +140,7 @@ obs_F <- calc_F(dataset) %>% round(digits = 4)
 N <- 1e4
 perm_F <- 1:N %>% sapply(sample_F, input = dataset)
 
-p <- sum(perm_F > obs_F)/length(perm_F)
+p <- sum(perm_F > obs_F)/length(perm_F) %>% round(digits = 4)
 p
 
 ggplot() + 
@@ -150,4 +150,49 @@ ggplot() +
   ggtitle("Histogram of the F Statistic") +
   xlab("F statistic") +
   geom_text(aes(x = 1, y = 150), label = "observed F", colour = "firebrick")
+```
+
+Given a p-value of `r p` we fail to reject $H_0$ and find that there is not difference in the village mean family sizes.
+
+d)
+
+```{r Q2_d}
+
+test_p <- function(i = 1, input, perm = FALSE) {
+  if (perm)
+    input <- input %>% dplyr::mutate(village = sample(village))
+  lm(size ~ village, data = input) %>% anova %>% .[["Pr(>F)"]] %>% .[1]
+}
+
+test_r2 <- function(i = 1, input, perm = FALSE) {
+  if (perm)
+    input <- input %>% dplyr::mutate(village = sample(village))
+  lm(size ~ village, data = input) %>% summary %>% .[["r.squared"]]
+}
+
+draw_hist <- function(perm_values, observed) {
+  h <- ggplot() + 
+  geom_histogram(data = data.frame(x = perm_values), 
+                 aes(x = x), bins = 10, fill = "white", colour = "grey") +
+  geom_vline(xintercept = observed, colour = "firebrick", linetype = "dashed") +
+  ggtitle("Histogram of permutation values") +
+  xlab("test statistic")
+  print(h)
+}
+
+permutation_test = function(test_func, dataset, niter, comparator) {
+  test_stat <- test_func(input = dataset)
+  perms <- 1:niter %>% sapply(test_func, input = dataset, perm = TRUE)
+  
+  draw_hist(perms, test_stat)
+  
+  sum(comparator(test_stat, perms))/niter
+}
+
+set.seed(202)
+p <- permutation_test(test_p, dataset, 1e4, `>`)
+
+set.seed(303)
+p_r2 <- permutation_test(test_r2, dataset, 1e4, `<`)
+
 ```
