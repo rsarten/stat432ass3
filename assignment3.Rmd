@@ -127,25 +127,29 @@ tapply(dataset$size, dataset$village, mean) %>% round(digits = 4)
 c)
 
 ```{r Q2_c}
-set.seed(101)
 
 calc_F <- function(input)
-  lm(size ~ village, data = input) %>% anova() %>% .[["F value"]] %>% .[1]
+  input[["fstatistic"]]["value"]
 
-sample_F <- function(iter, input)
-  input %>% dplyr::mutate(village = sample(village)) %>% calc_F()
-
-obs_F <- calc_F(dataset) %>% round(digits = 4)
+obs_F <- lm(size ~ village, data = dataset) %>% 
+  summary() %>% calc_F() %>% round(digits = 3)
 
 N <- 1e4
-perm_F <- 1:N %>% sapply(sample_F, input = dataset)
+set.seed(150)
+perm_F <- 1:N %>% 
+  lapply(function(i) sample(dataset$village)) %>%
+  lapply(function(groups) lm(dataset$size ~ groups)) %>% 
+  lapply(summary) %>% 
+  sapply(calc_F) %>% 
+  round(digits = 3)
 
-p <- sum(perm_F > obs_F)/length(perm_F) %>% round(digits = 4)
+p <- sum(perm_F >= obs_F)/N
 p
 
 ggplot() + 
-  geom_histogram(data = data.frame(x = perm_F), 
-                 aes(x = x), bins = 50, fill = "white", colour = "grey") +
+  geom_histogram(data = data.frame(x = perm_F), aes(x = x), 
+                 breaks = seq(from = 0, to = max(perm_F), length.out = 30),
+                 fill = "white", colour = "grey") +
   geom_vline(xintercept = obs_F, colour = "firebrick", linetype = "dashed") +
   ggtitle("Histogram of the F Statistic") +
   xlab("F statistic") +
@@ -158,41 +162,59 @@ d)
 
 ```{r Q2_d}
 
-test_p <- function(i = 1, input, perm = FALSE) {
-  if (perm)
-    input <- input %>% dplyr::mutate(village = sample(village))
-  lm(size ~ village, data = input) %>% anova %>% .[["Pr(>F)"]] %>% .[1]
-}
-
-test_r2 <- function(i = 1, input, perm = FALSE) {
-  if (perm)
-    input <- input %>% dplyr::mutate(village = sample(village))
-  lm(size ~ village, data = input) %>% summary %>% .[["r.squared"]]
-}
-
 draw_hist <- function(perm_values, observed) {
-  h <- ggplot() + 
-  geom_histogram(data = data.frame(x = perm_values), 
-                 aes(x = x), bins = 10, fill = "white", colour = "grey") +
-  geom_vline(xintercept = observed, colour = "firebrick", linetype = "dashed") +
-  ggtitle("Histogram of permutation values") +
-  xlab("test statistic")
-  print(h)
+  print(
+    ggplot() + 
+      geom_histogram(data = data.frame(x = perm_values), aes(x = x), 
+                     breaks = seq(from = 0, to = max(perm_values), length.out = 10), 
+                     fill = "white", colour = "grey") +
+      geom_vline(xintercept = observed, colour = "firebrick", linetype = "dashed") +
+      ggtitle("Histogram of permutation values") +
+      xlab("test statistic"))
 }
 
 permutation_test = function(test_func, dataset, niter, comparator) {
-  test_stat <- test_func(input = dataset)
-  perms <- 1:niter %>% sapply(test_func, input = dataset, perm = TRUE)
+  test_stat <- lm(size ~ village, data = dataset) %>% 
+    summary() %>% test_func() %>% round(digits = 3)
+  
+  set.seed(150)
+  perms <- 1:niter %>% 
+    lapply(function(i) sample(dataset$village)) %>%
+    lapply(function(groups) lm(dataset$size ~ groups)) %>% 
+    lapply(summary) %>% 
+    sapply(test_func) %>% 
+    round(digits = 3)
   
   draw_hist(perms, test_stat)
-  
-  sum(comparator(test_stat, perms))/niter
+  sum(comparator(perms, test_stat))/niter
 }
 
-set.seed(202)
-p <- permutation_test(test_p, dataset, 1e4, `>`)
+```
 
-set.seed(303)
-p_r2 <- permutation_test(test_r2, dataset, 1e4, `<`)
+e)
 
+A p-value is the probability of obtaining a test statistic as, or more, extreme than the test statistic observed under the null hypothesis. The p-value is a suitable test statistic to use in a permutation test as the relationship between  the F statistic and the p-value means that the result of the ANOVA is preserved. Increasing the F statistic will always result in a decrease in the p-value so long as the degrees of freedom remain the same. Meaning that for all $F_x > F_y$, there will be $p_x < p_y$.
+
+Using the same `set.seed` value will mean that the permutations of grouping values will be the same across tests even where the test statistic in question changes. Given the case above, the ratio of cases above/below the observed statistic will remain the same, giving the same final p-value.
+
+The generated p-values appear to be drawn from a uniform distribution, and this is what we would expect under a null hypothesis.
+
+```{r Q2_e}
+calc_p <- function(input)
+  pf(input$fstatistic, input$df[1]-1, input$df[2], lower.tail = FALSE)["value"]
+
+p <- permutation_test(calc_p, dataset, 1e4, `<=`)
+p
+```
+
+f)
+
+A large $R^2$ value means the linear model fits the data well. This would also indicate that the F-statistic would be large as at least one of the coefficients in the model would be non-zero. This would mean that for all $F_x > F_y$ we have $R_x^2 > R_y^2$.
+
+```{r Q2_f}
+calc_r2 <- function(input)
+  input[["r.squared"]]
+
+r2 <- permutation_test(calc_r2, dataset, 1e4, `>=`)
+r2
 ```
