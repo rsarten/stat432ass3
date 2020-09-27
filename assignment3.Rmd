@@ -156,7 +156,7 @@ ggplot() +
   geom_text(aes(x = 1, y = 150), label = "observed F", colour = "firebrick")
 ```
 
-Given a p-value of `r p` we fail to reject $H_0$ and find that there is not difference in the village mean family sizes.
+Given a p-value of `r p` we fail to reject $H_0$ and find that there is not a difference in the mean family sizes.
 
 d)
 
@@ -217,4 +217,51 @@ calc_r2 <- function(input)
 
 r2 <- permutation_test(calc_r2, dataset, 1e4, `>=`)
 r2
+```
+
+## Question 3
+
+a)
+
+The chi-squared test statistic: 
+
+$\chi^2 = \sum \dfrac{(O_i - E_i)}{E_i}$ where $O_i$ is the observed value in cell $i$ and $E_i$ is the expected value in cell $i$.
+
+```{r Q3_a}
+
+living_standards <- data.frame(
+  significant_hardship = c(34, 27),
+  fairly_comfortable = c(18, 22),
+  comfortable = c(23, 52),
+  good = c(9, 20),
+  row.names = c("with_dep_children", "no_dep_children"))
+
+chisq.test(living_standards)
+```
+
+With p-value of 0.0166 we reject $H_0$ at the 5% level. We conclude that there is a difference in living standards between families with dependent children and families without dependent children.
+
+b)
+
+```{r Q3_b}
+
+families <- data.frame(
+  dependent_children = c(rep("Yes", 84L), rep("No", 121L)),
+  living_standard = c(rep("significant_hardship", 34L),
+                      rep("fairly_comfortable", 18L),
+                      rep("comfortable", 23L),
+                      rep("good", 9L),
+                      rep("significant_hardship", 27L),
+                      rep("fairly_comfortable", 22L),
+                      rep("comfortable", 52L),
+                      rep("good", 20L)))
+
+tt <- table(families)
+outer(rowSums(tt), colSums(tt))/sum(tt)
+## expect input as table
+calc_X2 <- function(input) {
+  
+}
+
+
 ```
