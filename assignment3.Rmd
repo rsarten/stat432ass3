@@ -243,6 +243,22 @@ With p-value of 0.0166 we reject $H_0$ at the 5% level. We conclude that there i
 
 b)
 
+The procedure for the permutation chi-square test is as follows:
+
+1. Construct a data.frame with a column indicating the child dependency status and another indicating the living standard. There will be a single row giving the observed combination for each family.
+
+2. Calculate the observed $\chi^2$ value $(\chi^2_{obs})$. Tabulate the observed table $O$ then calculate the expected matrix $E$. The expected table is calculated as the outer product of the tabulated row and column sums of the observed counts.
+
+$$E = \dfrac{rowsum(O)*colsum^T(O)}{n}$$
+
+The chi-square test statistic can then be calculated using the formula in a).
+
+3. For each permutation randomly reallocate the values for dependent children, while holding the living standard fixed. Under the null hypothesis each value for the dependent children is equally likely for the levels of living standards. The chi-square statistic for each permutation $\chi^2_{perm}$ is calculated as above.
+
+4. p-value is calculated as:
+
+$$\text{p-value} = \dfrac{\text{No of }\chi^2_{perm} >= \chi^2_{obs}}{\text{No of permutations}}$$
+
 ```{r Q3_b}
 
 families <- data.frame(
@@ -256,12 +272,38 @@ families <- data.frame(
                       rep("comfortable", 52L),
                       rep("good", 20L)))
 
-tt <- table(families)
-outer(rowSums(tt), colSums(tt))/sum(tt)
-## expect input as table
-calc_X2 <- function(input) {
-  
+## calculates E, then formula for chi-squared
+calc_X2 <- function(observed) {
+  expected <- outer(rowSums(observed), colSums(observed))/sum(observed)
+  sum((observed - expected)^2/expected)
 }
 
+## calculate observed chi-square test statistic
+obs_X2 <- calc_X2(table(families)) %>% round(digits = 4)
 
+N <- 1000
+set.seed(101)
+perm_X2 <- 1:N %>% 
+  ## shuffle dependent child values
+  lapply(function(i) sample(families$dependent_children)) %>%
+  ## generate table against fixed living standard values
+  lapply(table, families$living_standard) %>% 
+  ## calculate chi-square test statistic
+  sapply(calc_X2) %>% 
+  round(digits = 4)
+
+p <- sum(perm_X2 >= obs_X2)/N
+
+ggplot() + 
+  geom_histogram(data = data.frame(x = perm_X2), aes(x = x), 
+                 breaks = seq(from = 0, to = max(perm_X2), length.out = 20),
+                 fill = "white", colour = "grey") +
+  geom_vline(xintercept = obs_X2, colour = "firebrick", linetype = "dashed") +
+  ggtitle("Histogram of the chi-square statistic") +
+  xlab("test statistic") +
+  geom_text(aes(x = 12.3, y = 50), label = "observed test statistic", colour = "firebrick")
 ```
+
+With p-value of `r p` we reject $H_0$ at the 5% level. We conclude that there is a difference in living standards between families with dependent children and families without dependent children.
+
+The histogram above clearly demonstrates that $\chi^2_{obs}$ lies well into the tail of the $\chi^2_{perm}$ distribution.
