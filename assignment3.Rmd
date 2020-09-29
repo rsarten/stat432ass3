@@ -307,3 +307,65 @@ ggplot() +
 With p-value of `r p` we reject $H_0$ at the 5% level. We conclude that there is a difference in living standards between families with dependent children and families without dependent children.
 
 The histogram above clearly demonstrates that $\chi^2_{obs}$ lies well into the tail of the $\chi^2_{perm}$ distribution.
+
+## Question 4
+
+a)
+
+```{r Q4_a}
+rabbits <- readr::read_csv("bp_rabbits.csv", col_types = readr::cols())
+ggplot(data = rabbits, aes(x = Dose, y = BPchange, colour = Treatment)) + 
+  geom_point() +
+  facet_wrap(~ Animal) +
+  ggtitle("Change in blood pressure (BPchange) by Dose and Treatment\nfor five different animals")
+```
+
+b) 
+
+```{r Q4_b}
+model <- lm(BPchange ~ Dose + Treatment + Animal, data = rabbits)
+summary(model)
+anova(model)
+```
+
+Animal is included as a predictor to account for any of the effects or differences between individual rabbits. There are multiple observations of a single rabbit, each of which may have different reactions and baseline blood pressures when subjected to the drug, this needs to be accounted for.
+
+c) 
+
+The procedure for the permutation test is as follows:
+
+1. Calcualte the observed F statistic $F_{obs}$
+2. For each permutation randomly allocate the 60 values for `Treatment` while hold `Dose` and `Animal` in place.
+3. Calculate the permuted F statistic $F_{perm}$
+4. The p-value is calculate as:
+
+$$\text{p-value} = \dfrac{\text{No of }F_{perm} > F_{obs}}{\text{No of permutations}}$$
+
+```{r Q4_c}
+calc_F <- function(treatment, dataset) {
+  lm(BPchange ~ Dose + treatment + Animal, data = dataset) %>% 
+    summary() %>% .[["fstatistic"]] %>% .["value"] %>% unname()
+}
+
+obs_F <- calc_F(rabbits$Treatment, rabbits)
+obs_F
+
+N <- 1000
+set.seed(101)
+perm_F <- 1:N %>% 
+  lapply(function(i) {sample(rabbits$Treatment)}) %>% 
+  sapply(calc_F, rabbits)
+
+p <- sum(perm_F >= obs_F)/N
+
+ggplot() + 
+  geom_histogram(data = data.frame(x = perm_F), aes(x = x), 
+                 breaks = seq(from = min(perm_F), to = max(perm_F), length.out = 20),
+                 fill = "white", colour = "grey") +
+  geom_vline(xintercept = obs_F, colour = "firebrick", linetype = "dashed") +
+  ggtitle("Histogram of the F statistic") +
+  xlab("test statistic") +
+  geom_text(aes(x = obs_F - 1, y = 50), label = "observed test statistic", colour = "firebrick")
+```
+
+With p-value of `r p` we reject $H_0$ at the 5% level. We conclude that Treatment has an effect on the change in blood pressure after allowing for Dose and Animal.
