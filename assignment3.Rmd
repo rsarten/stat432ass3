@@ -239,7 +239,7 @@ living_standards <- data.frame(
 chisq.test(living_standards)
 ```
 
-With p-value of 0.0166 we reject $H_0$ at the 5% level. We conclude that there is a difference in living standards between families with dependent children and families without dependent children.
+With a p-value of 0.0166 we reject $H_0$ at the 5% level. We conclude that there is a difference in living standards between families with dependent children and families without dependent children.
 
 b)
 
@@ -304,7 +304,7 @@ ggplot() +
   geom_text(aes(x = 12.3, y = 50), label = "observed test statistic", colour = "firebrick")
 ```
 
-With p-value of `r p` we reject $H_0$ at the 5% level. We conclude that there is a difference in living standards between families with dependent children and families without dependent children.
+With a p-value of `r p` we reject $H_0$ at the 5% level. We conclude that there is a difference in living standards between families with dependent children and families without dependent children.
 
 The histogram above clearly demonstrates that $\chi^2_{obs}$ lies well into the tail of the $\chi^2_{perm}$ distribution.
 
@@ -334,12 +334,12 @@ c)
 
 The procedure for the permutation test is as follows:
 
-1. Calcualte the observed F statistic $F_{obs}$
+1. Calculate the observed F statistic $F_{obs}$
 2. For each permutation randomly allocate the 60 values for `Treatment` while hold `Dose` and `Animal` in place.
 3. Calculate the permuted F statistic $F_{perm}$
-4. The p-value is calculate as:
+4. As larger values for RSS support $H_0$, the p-value is calculate as:
 
-$$\text{p-value} = \dfrac{\text{No of }F_{perm} > F_{obs}}{\text{No of permutations}}$$
+$$\text{p-value} = \dfrac{\text{No of }F_{perm} < F_{obs}}{\text{No of permutations}}$$
 
 ```{r Q4_c}
 calc_F <- function(treatment, dataset) {
@@ -368,4 +368,67 @@ ggplot() +
   geom_text(aes(x = obs_F - 1, y = 50), label = "observed test statistic", colour = "firebrick")
 ```
 
-With p-value of `r p` we reject $H_0$ at the 5% level. We conclude that Treatment has an effect on the change in blood pressure after allowing for Dose and Animal.
+With a p-value of `r p` we reject $H_0$ at the 5% level. We conclude that Treatment has an effect on the change in blood pressure after allowing for Dose and Animal.
+
+d)
+
+1. Calculate $RSS_{obs}$
+2. For each permutation of the design matrix for the full model, $X$, this will contain 11 columns. THe first 7 columns contain the values for the observed main effects, while the last 4 columns contain the interaction values
+3. Extract the interaction term from the design matrix of the full model. Reorder the interaction levels while keeping the main effects in place
+4. Calculate the coefficients of the reordered design matrix:
+
+$$\hat{\beta}_{perm} = (X^T_{perm}X_{perm})^{-1}X^T_{perm}\boldsymbol{y}$$
+
+5. Calculated the fitted value:
+
+$$\hat{\boldsymbol{y}}_{perm} = X_{perm}\hat{\beta}_{perm}$$
+
+6. Calculate the residual sum of squares:
+
+$$RSS_{perm} = (\boldsymbol{y}-\hat{\boldsymbol{y}})^2$$
+
+7. Repeat steps 2 - 7 $n$ times
+8. Calculate the p-value for the permutation test:
+
+$$\text{p-value} = \dfrac{\text{No of }RSS_{perm} < RSS_{obs}}{\text{No of permutations}}$$
+
+```{r Q4_d}
+y <- rabbits$BPchange
+X_reduced <- model.matrix(BPchange ~ Dose + Animal + Treatment, data = rabbits)
+X_complete <- model.matrix(BPchange ~ Dose + Animal + Treatment + Animal:Treatment, data = rabbits)
+
+####################################
+## RSS calculation functions
+beta_est <- function(X, y)
+  solve(t(X) %*% X) %*% t(X) %*% y
+
+y_est <- function(X, y)
+  X %*% beta_est(X, y)
+
+calc_RSS <- function(X, y)
+  sum((y - y_est(X, y))^2)
+####################################
+
+## Observed test statistic
+obs_RSS <- calc_RSS(X_complete, y)
+
+N <- 1000
+set.seed(101)
+perm_RSS <- 1:N %>% 
+  lapply(function(i) {cbind(X_reduced, X_complete[sample(nrow(X_complete)), 8:11])}) %>% 
+  sapply(calc_RSS, y)
+
+p <- sum(perm_RSS < obs_RSS)/N
+p
+
+ggplot() + 
+  geom_histogram(data = data.frame(x = perm_RSS), aes(x = x), 
+                 breaks = seq(from = min(perm_RSS), to = max(perm_RSS), length.out = 20),
+                 fill = "white", colour = "grey") +
+  geom_vline(xintercept = obs_RSS, colour = "firebrick", linetype = "dashed") +
+  ggtitle("Histogram of the RSS test statistic values") +
+  xlab("test statistic") +
+  geom_text(aes(x = obs_RSS - 70, y = 170), label = "observed test statistic", colour = "firebrick")
+```
+
+With a p-value of `r p`  we fail to reject $H_0$ and conclude that there is no interaction between Animal and Treatment.
